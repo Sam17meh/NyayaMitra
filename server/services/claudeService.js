@@ -419,44 +419,51 @@ export async function processMessage(message, getLegalContexts, language = 'Engl
 
   const ragUrl = process.env.N8N_WEBHOOK_URL || process.env.RAG_WEBHOOK_URL;
 
-  // 1. PRIMARY ENGINE: USER'S RAG MODEL WEBHOOK URL
+  // 1. PRIMARY ENGINE: USER'S RAG MODEL WEBHOOK URL (Supports both /webhook/ and /webhook-test/)
   if (ragUrl) {
-    console.log(`[RAG Primary Engine] Forwarding user query directly to RAG Webhook URL: ${ragUrl}`);
-    try {
-      const n8nResponse = await axios.post(
-        ragUrl,
-        {
-          message,
-          query: message,
-          language,
-          category: domainInfo.category,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'ngrok-skip-browser-warning': 'true',
+    const urlsToTry = [
+      ragUrl,
+      ragUrl.includes('/webhook/') ? ragUrl.replace('/webhook/', '/webhook-test/') : ragUrl.replace('/webhook-test/', '/webhook/')
+    ];
+
+    for (const targetUrl of urlsToTry) {
+      console.log(`[RAG Primary Engine] Forwarding query to RAG Webhook URL: ${targetUrl}`);
+      try {
+        const n8nResponse = await axios.post(
+          targetUrl,
+          {
+            message,
+            query: message,
+            language,
+            category: domainInfo.category,
           },
-          timeout: 12000,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true',
+            },
+            timeout: 12000,
+          }
+        );
+
+        const rawData = n8nResponse.data || {};
+        let ragAnswer = '';
+        if (typeof rawData === 'string' && rawData.trim()) {
+          ragAnswer = rawData.trim();
+        } else if (typeof rawData === 'object') {
+          ragAnswer = rawData.answer || rawData.output || rawData.response || rawData.legalAdvice || rawData.result || rawData.text || '';
         }
-      );
 
-      const rawData = n8nResponse.data || {};
-      let ragAnswer = '';
-      if (typeof rawData === 'string' && rawData.trim()) {
-        ragAnswer = rawData.trim();
-      } else if (typeof rawData === 'object') {
-        ragAnswer = rawData.answer || rawData.output || rawData.response || rawData.legalAdvice || rawData.result || rawData.text || '';
+        if (ragAnswer && typeof ragAnswer === 'string' && ragAnswer.length > 20) {
+          console.log(`[RAG Primary Engine SUCCESS] Received legal analysis from RAG Webhook URL!`);
+          return {
+            category: domainInfo.category,
+            answer: ragAnswer,
+          };
+        }
+      } catch (ragErr) {
+        console.warn(`[RAG Primary Engine Warning] Webhook ${targetUrl} skipped (${ragErr.message}).`);
       }
-
-      if (ragAnswer && typeof ragAnswer === 'string' && ragAnswer.length > 20) {
-        console.log(`[RAG Primary Engine SUCCESS] Successfully received legal analysis from RAG URL!`);
-        return {
-          category: domainInfo.category,
-          answer: ragAnswer,
-        };
-      }
-    } catch (ragErr) {
-      console.warn(`[RAG Primary Engine Error] Webhook ${ragUrl} unavailable/empty (${ragErr.message}). Falling back to secondary engine.`);
     }
   }
 
