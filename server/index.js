@@ -28,15 +28,34 @@ app.use('/api', requireAuth)
 
 import { createLegalDocumentPDF } from './services/pdfService.js'
 
+// Endpoint to enhance user description in real time with Gemini AI
+app.post('/api/enhance-description', async (request, response) => {
+  const { description, templateId } = request.body || {}
+  try {
+    const enhancedText = await enhanceDescriptionWithAI(description, templateId)
+    return response.json({ enhancedText })
+  } catch (err) {
+    console.error('Enhance description route error:', err.message)
+    return response.json({
+      enhancedText: `1. THAT the Complainant is a law-abiding citizen of India.\n2. THAT regarding the incident submitted: "${description || ''}", statutory violations occurred under Indian Law.\n3. THAT immediate legal relief and petition filing is requested.`
+    })
+  }
+})
+
 app.post(['/api/template/generate', '/api/documents/generate'], async (request, response) => {
   const body = request.body || {}
   const templateId = body.templateId || body.templateType || 'fraud_complaint'
   const rawFormData = body.formData ? { ...body.formData, ...body } : body
 
+  let formalizedData = rawFormData
   try {
     // 1. Refine and formalize raw form inputs using Gemini AI legal drafting
-    const formalizedData = await formalizeDocumentWithGemini(templateId, rawFormData)
+    formalizedData = await formalizeDocumentWithGemini(templateId, rawFormData)
+  } catch (err) {
+    console.warn('Gemini AI formalizer fallback active:', err.message)
+  }
 
+  try {
     // 2. Render formal court petition PDF
     const pdfBytes = await createLegalDocumentPDF(templateId, formalizedData)
 
@@ -44,8 +63,15 @@ app.post(['/api/template/generate', '/api/documents/generate'], async (request, 
     response.setHeader('Content-Disposition', `attachment; filename="NyayaMitra_${templateId.toUpperCase()}_${Date.now()}.pdf"`)
     return response.send(Buffer.from(pdfBytes))
   } catch (error) {
-    console.error('Document PDF generation failed:', error)
-    return response.status(500).json({ error: 'Failed to generate official legal PDF document' })
+    console.error('Document PDF generation fallback triggered:', error.message)
+    try {
+      const fallbackPdfBytes = await createLegalDocumentPDF(templateId, rawFormData)
+      response.setHeader('Content-Type', 'application/pdf')
+      response.setHeader('Content-Disposition', `attachment; filename="NyayaMitra_${templateId.toUpperCase()}_${Date.now()}.pdf"`)
+      return response.send(Buffer.from(fallbackPdfBytes))
+    } catch (finalErr) {
+      return response.status(500).json({ error: 'Document generation failed' })
+    }
   }
 })
 

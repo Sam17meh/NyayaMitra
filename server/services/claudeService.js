@@ -809,3 +809,45 @@ Return ONLY a valid JSON object matching this exact structure (no markdown fence
     isAiFormalized: true,
   };
 }
+
+export async function enhanceDescriptionWithAI(rawDescription, templateId = 'fraud_complaint') {
+  console.log(`[AI Description Enhancer] Enhancing raw user description for template: ${templateId}`);
+
+  if (!rawDescription || !rawDescription.trim()) {
+    return '1. THAT the Complainant is a law-abiding citizen of India.\n2. THAT the Complainant has suffered a statutory default and financial loss.\n3. THAT immediate legal intervention is requested.';
+  }
+
+  const gemini = getGeminiClient();
+
+  if (gemini) {
+    const prompt = `You are a Senior Supreme Court Legal Drafter in India.
+Enhance and rewrite the following user-submitted informal description of a legal dispute into formal, highly authoritative Indian court petition statement of facts.
+
+User Raw Description: "${rawDescription}"
+Document Category / Type: "${templateId}"
+
+Rules:
+1. Rephrase raw notes into clean, numbered court statements starting with "1. THAT...", "2. THAT...".
+2. Use precise formal legal vocabulary ("Complainant", "Respondent", "unauthorized debit", "statutory breach", "wrongful inducement").
+3. Mention relevant Indian laws (IT Act 2000, BNS 2023, Consumer Protection Act 2019, POSH Act 2013, Model Tenancy Act, Payment of Wages Act 1936).
+4. Do NOT output JSON or markdown fences. Output ONLY the clean enhanced formal text paragraphs ready to paste into a legal document.`;
+
+    try {
+      const response = await gemini.models.generateContent({
+        model: 'gemini-3.6-flash',
+        contents: prompt,
+      });
+
+      if (response?.text) {
+        console.log('[AI Description Enhancer SUCCESS] Successfully enhanced user description with Gemini!');
+        return response.text.replace(/```/g, '').trim();
+      }
+    } catch (err) {
+      console.warn('[AI Description Enhancer] Gemini call skipped:', err.message);
+    }
+  }
+
+  // Local fallback enhancer
+  console.log('[AI Description Enhancer] Using local formal transformer fallback');
+  return `1. THAT the Applicant/Complainant is a law-abiding citizen of India.\n2. THAT regarding the incident submitted: "${rawDescription}", the Respondent committed acts constituting statutory default and legal violation.\n3. THAT the said actions violate fundamental statutory rights under applicable Indian laws and cause severe financial / personal hardship.\n4. THAT the Applicant prays for immediate official intervention and restitution under law.`;
+}
