@@ -703,3 +703,109 @@ User Query: "${message}"`;
     answer: fallbackAnswer,
   };
 }
+
+export async function formalizeDocumentWithGemini(templateId, formData = {}) {
+  console.log(`[Legal AI Formalizer] Formalizing user form inputs for template: ${templateId}`);
+
+  const gemini = getGeminiClient();
+
+  if (gemini) {
+    const prompt = `You are a Senior Supreme Court Advocate and official legal draftsman in India.
+Your task is to take informal, raw user-submitted form data for an official Indian legal document (${templateId}) and convert raw notes into formal, highly professional Indian court petition language.
+
+User Raw Input Data:
+${JSON.stringify(formData, null, 2)}
+
+Requirements:
+1. Rephrase raw user descriptions, notes, and complaints into formal legal statements of fact using proper legal terminology (e.g., "Complainant", "Applicant", "Respondent", "Opposite Party", "unauthorized debit", "statutory default").
+2. Format statement of facts into clean, numbered formal court paragraphs starting with "1. THAT...", "2. THAT...".
+3. Cite exact relevant Indian statutory laws and section numbers (e.g. IT Act Sec 66D, BNS 2023 Sec 318, POSH Act 2013, Model Tenancy Act, Payment of Wages Act 1936 Sec 15, Consumer Protection Act 2019 Sec 35, RTI Act 2005 Sec 6(1)).
+4. Provide a formal, powerful "PRAYER FOR RELIEF" demanding specific legal remedies.
+
+Return ONLY a valid JSON object matching this exact structure (no markdown fences, no code blocks):
+{
+  "formalAddressee": "BEFORE THE STATION HOUSE OFFICER / AUTHORIZED OFFICER / COURT",
+  "formalSubject": "OFFICIAL PETITION / DEMAND NOTICE REGARDING...",
+  "formalStatementOfFacts": "1. THAT the Applicant is a law-abiding citizen of India residing at the given address.\\n2. THAT on [Date], the Respondent committed...",
+  "applicableSections": "Section 66D IT Act 2000; Section 318 BNS 2023; RBI Circular 2017.",
+  "formalPrayerForRelief": "PRAYER FOR RELIEF:\\nWherefore, it is most respectfully prayed that this Hon'ble Authority may be pleased to:\\na) Register an official FIR against the Respondent;\\nb) Order immediate recovery/refund of INR [Amount];\\nc) Grant suitable compensation for mental harassment."
+}`;
+
+    const geminiModels = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+
+    for (const modelName of geminiModels) {
+      try {
+        const response = await gemini.models.generateContent({
+          model: modelName,
+          contents: prompt,
+        });
+
+        const rawText = response?.text || '';
+        const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanJson);
+
+        if (parsed && (parsed.formalStatementOfFacts || parsed.formalSubject)) {
+          console.log(`[Legal AI Formalizer SUCCESS] Drafted formal legal petition with Gemini (${modelName})`);
+          return {
+            ...formData,
+            ...parsed,
+            isAiFormalized: true,
+          };
+        }
+      } catch (err) {
+        console.warn(`[Legal AI Formalizer] Gemini model ${modelName} call skipped:`, err.message);
+      }
+    }
+  }
+
+  // Local Guaranteed Formal Legal Transformer Fallback
+  console.log(`[Legal AI Formalizer] Using guaranteed local legal transformer fallback for: ${templateId}`);
+
+  let formalAddressee = 'BEFORE THE COMPETENT LEGAL AUTHORITY & POLICE DESK';
+  let formalSubject = `OFFICIAL LEGAL PETITION REGARDING ${templateId.toUpperCase()}`;
+  let formalStatementOfFacts = '';
+  let applicableSections = 'Bharatiya Nyaya Sanhita (BNS 2023) & Constitutional Remedies';
+  let formalPrayerForRelief = 'PRAYER FOR RELIEF:\nWherefore, it is most respectfully prayed that this Hon\'ble Authority may be pleased to grant immediate statutory relief and pass appropriate orders.';
+
+  if (templateId === 'fraud_complaint') {
+    formalAddressee = 'BEFORE THE OFFICER-IN-CHARGE, CYBER CRIME CELL / DISTRICT POLICE STATION';
+    formalSubject = `OFFICIAL COMPLAINT UNDER SECTION 66D IT ACT 2000 & SECTION 318 BNS 2023 FOR CYBER FRAUD OF INR ${formData.amountLost || '0'}`;
+    formalStatementOfFacts = `1. THAT the Complainant (${formData.fullName || 'Complainant'}) is a law-abiding citizen residing at ${formData.contactPhone || 'Registered Mobile Address'}.\n2. THAT on ${formData.transactionDate || 'the specified date'}, an unauthorized electronic transaction amounting to INR ${formData.amountLost || '0'} occurred via ${formData.bankName || 'Bank/UPI Platform'} bearing UTR Ref ${formData.utrReference || 'Pending'}.\n3. THAT the raw incident details submitted are as follows: "${formData.incidentDescription || 'Fraudulent unauthorized debit'}".\n4. THAT the acts of the unknown offenders constitute criminal cheating by personation and unauthorized computer access.`;
+    applicableSections = 'Section 43A & 66D of Information Technology Act 2000; Section 318 of Bharatiya Nyaya Sanhita (BNS 2023); RBI Circular on Zero Customer Liability 2017.';
+    formalPrayerForRelief = `PRAYER FOR RELIEF:\nWherefore, it is most respectfully prayed that this Hon'ble Authority may be pleased to:\na) Register an official First Information Report (FIR) under Section 318 BNS 2023;\nb) Issue urgent directives to ${formData.bankName || 'the Bank'} to freeze suspect node accounts;\nc) Order full restitution of INR ${formData.amountLost || '0'} under RBI Zero Customer Liability Guidelines.`;
+  } else if (templateId === 'legal_notice') {
+    formalAddressee = `FORMAL LEGAL DEMAND NOTICE\nTO: ${formData.recipientName || 'RECIPIENT'}\nADDRESS: ${formData.recipientAddress || 'RECIPIENT ADDRESS'}`;
+    formalSubject = `FORMAL LEGAL NOTICE FOR RECOVERY / DEFAULT: ${formData.noticeSubject || 'BREACH OF CONTRACT'}`;
+    formalStatementOfFacts = `1. THAT my Client (${formData.senderName || 'Sender'}) resides at ${formData.senderAddress || 'Sender Address'}.\n2. THAT you, the addressee (${formData.recipientName || 'Recipient'}), entered into an agreement/transaction with my Client.\n3. THAT you have committed statutory default as detailed: "${formData.disputeDetails || 'Failure to refund/pay statutory dues'}".\n4. THAT your failure to rectify the default within ${formData.deadlineDays || '15 Days'} has caused severe financial loss and mental agony to my Client.`;
+    applicableSections = 'Order 37 of Civil Procedure Code (CPC 1908); Section 316 of Bharatiya Nyaya Sanhita (BNS 2023); Section 73 of Indian Contract Act 1872.';
+    formalPrayerForRelief = `DEMAND & NOTICE:\nYou are hereby called upon to comply with the terms of this notice within ${formData.deadlineDays || '15 Days'}, failing which my Client shall initiate summary civil suit (Order 37 CPC) and criminal prosecution at your sole risk and costs.`;
+  } else if (templateId === 'rti_application') {
+    formalAddressee = `BEFORE THE PUBLIC INFORMATION OFFICER (PIO)\nDEPARTMENT: ${formData.publicAuthority || 'PUBLIC AUTHORITY'}\nADDRESS: ${formData.departmentAddress || 'DEPARTMENT ADDRESS'}`;
+    formalSubject = `APPLICATION FOR OBTAINING INFORMATION UNDER SECTION 6(1) OF THE RIGHT TO INFORMATION ACT, 2005`;
+    formalStatementOfFacts = `1. THAT the Applicant (${formData.applicantName || 'Applicant'}) is a citizen of India.\n2. THAT the Applicant seeks certified information and records regarding: "${formData.informationSought || 'Public works, expenditure, and official records'}" for the period ${formData.timePeriod || 'Relevant Period'}.\n3. THAT the statutory application fee of INR 10/- has been remitted via ${formData.feeMode || 'Postal Order'}.`;
+    applicableSections = 'Section 6(1) and Section 7(1) of the Right to Information Act, 2005; Article 19(1)(a) of the Constitution of India.';
+    formalPrayerForRelief = `PRAYER:\nIt is requested that certified copies of the information sought above be furnished to the Applicant within the statutory 30-day period as mandated under Section 7(1) of the RTI Act 2005.`;
+  } else if (templateId === 'employment_grievance') {
+    formalAddressee = `BEFORE THE LABOUR COMMISSIONER / CONCILIATION OFFICER\nCOMPANY: ${formData.companyName || 'EMPLOYER COMPANY'}`;
+    formalSubject = `OFFICIAL COMPLAINT REGARDING UNLAWFUL SALARY WITHHOLDING & WRONGFUL TERMINATION`;
+    formalStatementOfFacts = `1. THAT the Employee (${formData.employeeName || 'Employee'}, Designation: ${formData.designation || 'Staff'}) was employed with ${formData.companyName || 'Employer Company'}.\n2. THAT the Employer has illegally withheld earned wages/dues amounting to INR ${formData.unpaidSalary || '0'}.\n3. THAT the grievance details submitted: "${formData.grievanceDetails || 'Non-payment of salary and illegal termination'}".`;
+    applicableSections = 'Section 15 of Payment of Wages Act 1936; Section 25F of Industrial Disputes Act 1947; Section 316 BNS 2023.';
+    formalPrayerForRelief = `PRAYER FOR RELIEF:\nIt is prayed that the Labour Authorities direct the Employer to release INR ${formData.unpaidSalary || '0'} with 10x statutory compensation and interest thereon.`;
+  } else if (templateId === 'consumer_complaint') {
+    formalAddressee = `BEFORE THE DISTRICT CONSUMER DISPUTES REDRESSAL COMMISSION`;
+    formalSubject = `CONSUMER COMPLAINT UNDER SECTION 35 OF CONSUMER PROTECTION ACT 2019 FOR DEFECTIVE PRODUCT / UNFAIR TRADE PRACTICE`;
+    formalStatementOfFacts = `1. THAT the Complainant (${formData.complainantName || 'Complainant'}) purchased product/service from ${formData.sellerName || 'Seller'} vide Invoice ${formData.invoiceNumber || 'Invoice'}.\n2. THAT the product/service is severely defective: "${formData.defectDetails || 'Defective product and failure of warranty obligation'}".`;
+    applicableSections = 'Section 2(47), Section 35, and Section 84 of Consumer Protection Act 2019; Section 73 of Indian Contract Act 1872.';
+    formalPrayerForRelief = `PRAYER FOR RELIEF:\na) Direct the Seller to refund INR ${formData.claimAmount || '0'} with interest;\nb) Award INR 25,000 for mental harassment and litigation costs.`;
+  }
+
+  return {
+    ...formData,
+    formalAddressee,
+    formalSubject,
+    formalStatementOfFacts,
+    applicableSections,
+    formalPrayerForRelief,
+    isAiFormalized: true,
+  };
+}

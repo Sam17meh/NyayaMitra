@@ -62,6 +62,41 @@ export async function createClientLegalPDF(templateId, formData = {}) {
 
   y -= 65
 
+  // Helper for long paragraph text block with word wrap
+  const drawTextBlock = (label, text) => {
+    drawSectionHeader(label)
+    const content = String(text || 'No detailed statement provided.')
+    const lines = content.split('\n')
+    const marginX = 45
+    const maxW = width - 90
+
+    for (let rawLine of lines) {
+      if (!rawLine.trim()) {
+        y -= 6
+        continue
+      }
+      const words = rawLine.split(' ')
+      let line = ''
+      for (let word of words) {
+        const testLine = line ? `${line} ${word}` : word
+        const testW = fontNorm.widthOfTextAtSize(testLine, 8.5)
+        if (testW > maxW) {
+          if (y < 65) break
+          page.drawText(line, { x: marginX, y, size: 8.5, font: fontNorm, color: darkSlate })
+          y -= 12
+          line = word
+        } else {
+          line = testLine
+        }
+      }
+      if (line && y >= 65) {
+        page.drawText(line, { x: marginX, y, size: 8.5, font: fontNorm, color: darkSlate })
+        y -= 14
+      }
+    }
+    y -= 5
+  }
+
   // Helper for section headers
   const drawSectionHeader = (title, color = navyColor) => {
     page.drawRectangle({
@@ -100,245 +135,140 @@ export async function createClientLegalPDF(templateId, formData = {}) {
     y -= 15
   }
 
-  // Helper for text block
-  const drawTextBlock = (label, text) => {
-    drawSectionHeader(label)
-    const content = String(text || 'No detailed statement provided.')
-    const words = content.split(' ')
-    let line = ''
-    const marginX = 45
-    const maxW = width - 90
-
-    for (let word of words) {
-      const testLine = line ? `${line} ${word}` : word
-      const testW = fontNorm.widthOfTextAtSize(testLine, 9)
-      if (testW > maxW) {
-        if (y < 60) break
-        page.drawText(line, { x: marginX, y, size: 9, font: fontNorm, color: darkSlate })
-        y -= 13
-        line = word
-      } else {
-        line = testLine
-      }
-    }
-    if (line && y >= 60) {
-      page.drawText(line, { x: marginX, y, size: 9, font: fontNorm, color: darkSlate })
-      y -= 18
-    }
-  }
-
   // -------------------------------------------------------------
-  // TEMPLATE 1: FRAUD COMPLAINT (CYBER & FINANCIAL)
+  // DYNAMIC FORMAL AI LEGAL COURT PETITION RENDERING
   // -------------------------------------------------------------
-  if (templateId === 'fraud_complaint') {
-    page.drawText('BEFORE THE OFFICER-IN-CHARGE, CYBER CRIME CELL / POLICE STATION', {
+  const addresseeText = formData.formalAddressee || (
+    templateId === 'fraud_complaint' ? 'BEFORE THE OFFICER-IN-CHARGE, CYBER CRIME CELL / POLICE STATION' :
+    templateId === 'legal_notice' ? `FORMAL LEGAL DEMAND NOTICE\nTO: ${formData.recipientName || 'RECIPIENT'}` :
+    templateId === 'rti_application' ? `BEFORE THE PUBLIC INFORMATION OFFICER (PIO)\nDEPARTMENT: ${formData.publicAuthority || 'PUBLIC AUTHORITY'}` :
+    templateId === 'employment_grievance' ? `BEFORE THE LABOUR COMMISSIONER / CONCILIATION OFFICER\nCOMPANY: ${formData.companyName || 'EMPLOYER'}` :
+    'BEFORE THE DISTRICT CONSUMER DISPUTES REDRESSAL COMMISSION'
+  )
+
+  const subjectText = formData.formalSubject || (
+    templateId === 'fraud_complaint' ? `SUBJECT: OFFICIAL COMPLAINT UNDER SECTION 66D IT ACT 2000 & SECTION 318 BNS 2023 FOR CYBER FRAUD OF INR ${formData.amountLost || '0'}` :
+    templateId === 'legal_notice' ? `SUBJECT: FORMAL LEGAL DEMAND NOTICE FOR RECOVERY / DEFAULT: ${formData.noticeSubject || 'BREACH OF CONTRACT'}` :
+    templateId === 'rti_application' ? `SUBJECT: APPLICATION FOR OBTAINING INFORMATION UNDER SECTION 6(1) OF RTI ACT 2005` :
+    templateId === 'employment_grievance' ? `SUBJECT: DEMAND NOTICE FOR UNPAID SALARY & EMPLOYMENT GRIEVANCE` :
+    `SUBJECT: PETITION UNDER SECTION 35 OF CONSUMER PROTECTION ACT 2019`
+  )
+
+  page.drawText(addresseeText.split('\n')[0], {
+    x: 35,
+    y,
+    size: 10.5,
+    font: fontBold,
+    color: alertRed
+  })
+  y -= 18
+
+  if (addresseeText.split('\n')[1]) {
+    page.drawText(addresseeText.split('\n')[1], {
       x: 35,
       y,
-      size: 11,
-      font: fontBold,
-      color: alertRed
-    })
-    y -= 22
-
-    page.drawText('SUBJECT: OFFICIAL PETITION FOR FINANCIAL FRAUD UNDER SEC 43A IT ACT 2000 & SEC 318 BNS 2023', {
-      x: 35,
-      y,
-      size: 8.5,
+      size: 9,
       font: fontBold,
       color: navyColor
     })
-    y -= 25
+    y -= 16
+  }
 
-    drawSectionHeader('1. COMPLAINANT IDENTIFICATION & PARTICULARS')
+  page.drawText(subjectText, {
+    x: 35,
+    y,
+    size: 8.5,
+    font: fontBold,
+    color: navyColor
+  })
+  y -= 24
+
+  // 1. PARTICULARS TABLE
+  drawSectionHeader('1. PARTIES & COMPLAINANT PARTICULARS')
+  if (templateId === 'fraud_complaint') {
     drawRow('Complainant Name', formData.fullName)
     drawRow('Contact Phone', formData.contactPhone)
     drawRow('Bank / Platform', formData.bankName)
     drawRow('Incident Date', formData.transactionDate)
     drawRow('Monetary Loss (INR)', `INR ${formData.amountLost || '0'}`)
     drawRow('UTR / Ref Number', formData.utrReference || 'Pending Verification')
-
-    y -= 10
-    drawTextBlock('2. DETAILED STATEMENT OF FRAUD INCIDENT & FACTS', formData.incidentDescription)
-
-    drawSectionHeader('3. STATUTORY DEMAND & PRAYER FOR RELIEF', alertRed)
-    const prayerLines = [
-      '1. Immediately freeze and hold disputed funds under Section 43A of Information Technology Act 2000.',
-      '2. Register an official First Information Report (FIR) under Section 318 of Bharatiya Nyaya Sanhita (BNS).',
-      '3. Initiate cyber tracing of suspect IP / bank node and assist complainant in financial recovery.'
-    ]
-    for (let pLine of prayerLines) {
-      page.drawText(pLine, { x: 45, y, size: 8.5, font: fontNorm, color: darkSlate })
-      y -= 14
-    }
-  }
-
-  // -------------------------------------------------------------
-  // TEMPLATE 2: FORMAL LEGAL NOTICE
-  // -------------------------------------------------------------
-  else if (templateId === 'legal_notice') {
-    page.drawText('FORMAL LEGAL DEMAND NOTICE', {
-      x: 35,
-      y,
-      size: 13,
-      font: fontBold,
-      color: navyColor
-    })
-    page.drawText('(SERVED VIA REGISTERED POST WITH ACKNOWLEDGEMENT DUE)', {
-      x: 35,
-      y: y - 14,
-      size: 8,
-      font: fontOblique,
-      color: darkSlate
-    })
-    y -= 32
-
-    drawSectionHeader('SENDER & RECIPIENT PARTICULARS')
+  } else if (templateId === 'legal_notice') {
     drawRow('From (Sender)', formData.senderName)
     drawRow('Sender Address', formData.senderAddress)
     drawRow('To (Recipient)', formData.recipientName)
     drawRow('Recipient Address', formData.recipientAddress)
-    drawRow('Notice Subject', formData.noticeSubject)
     drawRow('Cure Deadline', formData.deadlineDays || '15 Days')
-
-    y -= 10
-    drawTextBlock('STATEMENT OF FACTS & CONTRACTUAL DEFAULT', formData.disputeDetails)
-
-    drawSectionHeader('STATUTORY DEMAND & LEGAL CONSEQUENCES', alertRed)
-    const noticeDemandLines = [
-      `1. You are hereby called upon to satisfy the above grievance within ${formData.deadlineDays || '15 Days'} of receipt of this notice.`,
-      '2. Take notice that failure to comply will compel my client to file a Civil Recovery Suit under Order 37 CPC.',
-      '3. You shall also be liable for all litigation costs, damages, and statutory interest accruing thereon.'
-    ]
-    for (let nLine of noticeDemandLines) {
-      page.drawText(nLine, { x: 45, y, size: 8.5, font: fontNorm, color: darkSlate })
-      y -= 14
-    }
-  }
-
-  // -------------------------------------------------------------
-  // TEMPLATE 3: RTI APPLICATION (RIGHT TO INFORMATION)
-  // -------------------------------------------------------------
-  else if (templateId === 'rti_application') {
-    page.drawText('APPLICATION FOR OBTAINING INFORMATION UNDER SECTION 6(1) OF RTI ACT, 2005', {
-      x: 35,
-      y,
-      size: 10.5,
-      font: fontBold,
-      color: navyColor
-    })
-    y -= 25
-
-    drawSectionHeader('1. APPLICANT & PUBLIC AUTHORITY PARTICULARS')
+  } else if (templateId === 'rti_application') {
     drawRow('Applicant Name', formData.applicantName)
     drawRow('Public Authority', formData.publicAuthority)
     drawRow('Department Address', formData.departmentAddress)
     drawRow('Period of Info', formData.timePeriod)
     drawRow('Application Fee', `INR 10/- via ${formData.feeMode || 'Postal Order'}`)
-
-    y -= 10
-    drawTextBlock('2. SPECIFIC INFORMATION & RECORDS SOUGHT', formData.informationSought)
-
-    drawSectionHeader('3. STATUTORY DECLARATION UNDER RTI ACT 2005')
-    const rtiLines = [
-      '1. I state that I am a citizen of India and entitled to seek information under Section 6(1) of RTI Act 2005.',
-      '2. The information requested does not fall under any exemption specified in Section 8 or 9 of the Act.',
-      '3. Please furnish the requested certified copies within the statutory 30-day period.'
-    ]
-    for (let rLine of rtiLines) {
-      page.drawText(rLine, { x: 45, y, size: 8.5, font: fontNorm, color: darkSlate })
-      y -= 14
-    }
-  }
-
-  // -------------------------------------------------------------
-  // TEMPLATE 4: EMPLOYMENT DISPUTE & SALARY RECOVERY NOTICE
-  // -------------------------------------------------------------
-  else if (templateId === 'employment_grievance') {
-    page.drawText('DEMAND NOTICE FOR UNPAID SALARY & EMPLOYMENT GRIEVANCE', {
-      x: 35,
-      y,
-      size: 11,
-      font: fontBold,
-      color: navyColor
-    })
-    page.drawText('UNDER SECTION 15 PAYMENT OF WAGES ACT 1936 & INDUSTRIAL DISPUTES ACT 1947', {
-      x: 35,
-      y: y - 14,
-      size: 8,
-      font: fontOblique,
-      color: darkSlate
-    })
-    y -= 32
-
-    drawSectionHeader('EMPLOYEE & EMPLOYER PARTICULARS')
+  } else if (templateId === 'employment_grievance') {
     drawRow('Employee Name', formData.employeeName)
     drawRow('Company Name', formData.companyName)
     drawRow('Designation', formData.designation)
     drawRow('Unpaid Period', formData.unpaidMonths)
-    drawRow('Claim Amount', `INR ${formData.claimAmount || '0'}`)
-
-    y -= 10
-    drawTextBlock('EMPLOYMENT GRIEVANCE & DEFAULT STATEMENT', formData.employmentGrievance)
-
-    drawSectionHeader('STATUTORY DEMAND & LABOUR COURT INTIMATION', alertRed)
-    const empLines = [
-      '1. Pay the full outstanding salary along with 18% p.a. statutory interest within 15 days of this notice.',
-      '2. Issue the Experience Certificate and Relieving Letter without unauthorized deductions.',
-      '3. In case of non-compliance, formal proceedings will be initiated before the Labour Commissioner & SAMADHAAN Portal.'
-    ]
-    for (let eLine of empLines) {
-      page.drawText(eLine, { x: 45, y, size: 8.5, font: fontNorm, color: darkSlate })
-      y -= 14
-    }
-  }
-
-  // -------------------------------------------------------------
-  // TEMPLATE 5: CONSUMER COURT PETITION
-  // -------------------------------------------------------------
-  else {
-    page.drawText('BEFORE THE DISTRICT CONSUMER DISPUTES REDRESSAL COMMISSION', {
-      x: 35,
-      y,
-      size: 11,
-      font: fontBold,
-      color: navyColor
-    })
-    page.drawText('PETITION UNDER SECTION 35 OF CONSUMER PROTECTION ACT, 2019', {
-      x: 35,
-      y: y - 14,
-      size: 8,
-      font: fontOblique,
-      color: darkSlate
-    })
-    y -= 32
-
-    drawSectionHeader('CONSUMER & OPPOSITE PARTY PARTICULARS')
+    drawRow('Claim Amount', `INR ${formData.unpaidSalary || formData.claimAmount || '0'}`)
+  } else {
     drawRow('Complainant Name', formData.consumerName)
     drawRow('Opposite Party', formData.sellerName)
     drawRow('Product / Service', formData.productService)
     drawRow('Purchase Date', formData.purchaseDate)
     drawRow('Invoice Number', formData.invoiceNumber)
-    drawRow('Compensation Demanded', `INR ${formData.compensationSought || '0'}`)
+    drawRow('Compensation Demanded', `INR ${formData.claimAmount || formData.compensationSought || '0'}`)
+  }
 
-    y -= 10
-    drawTextBlock('STATEMENT OF DEFICIENCY OF SERVICE / DEFECT', formData.defectDetails)
+  y -= 8
 
-    drawSectionHeader('PRAYER FOR RELIEF UNDER CONSUMER PROTECTION ACT 2019', alertRed)
-    const conLines = [
-      '1. Direct Opposite Party to refund full purchase amount with 12% interest from purchase date.',
-      '2. Award compensation for severe financial inconvenience and mental harassment.',
-      '3. Award litigation costs incurred by complainant.'
-    ]
-    for (let cLine of conLines) {
-      page.drawText(cLine, { x: 45, y, size: 8.5, font: fontNorm, color: darkSlate })
-      y -= 14
+  // 2. FORMAL STATEMENT OF FACTS & GROUNDS (AI REFINED)
+  const factsText = formData.formalStatementOfFacts || (
+    templateId === 'fraud_complaint' ? formData.incidentDescription :
+    templateId === 'legal_notice' ? formData.disputeDetails :
+    templateId === 'rti_application' ? formData.informationSought :
+    templateId === 'employment_grievance' ? formData.employmentGrievance || formData.grievanceDetails :
+    formData.defectDetails
+  )
+
+  drawTextBlock('2. FORMAL STATEMENT OF FACTS & STATUTORY GROUNDS', factsText)
+
+  // 3. APPLICABLE STATUTORY PROVISIONS CITED
+  if (y > 100) {
+    drawSectionHeader('3. APPLICABLE LAWS & SECTIONS CITED')
+    const sectionsText = formData.applicableSections || (
+      templateId === 'fraud_complaint' ? 'Information Technology Act 2000 (Sec 43A, 66D); Bharatiya Nyaya Sanhita 2023 (Sec 318); RBI Guidelines 2017' :
+      templateId === 'legal_notice' ? 'Order 37 Civil Procedure Code (CPC 1908); Bharatiya Nyaya Sanhita 2023 (Sec 316); Indian Contract Act 1872' :
+      templateId === 'rti_application' ? 'Right to Information Act 2005 (Sec 6(1), Sec 7(1)); Constitution of India (Article 19(1)(a))' :
+      templateId === 'employment_grievance' ? 'Payment of Wages Act 1936 (Sec 15); Industrial Disputes Act 1947 (Sec 25F); BNS 2023 (Sec 316)' :
+      'Consumer Protection Act 2019 (Sec 2(47), Sec 35, Sec 84); Indian Contract Act 1872 (Sec 73)'
+    )
+    page.drawText(sectionsText, { x: 45, y, size: 8.5, font: fontOblique, color: navyColor })
+    y -= 20
+  }
+
+  // 4. FORMAL PRAYER FOR RELIEF
+  if (y > 90) {
+    drawSectionHeader('4. FORMAL PRAYER FOR RELIEF & DEMAND', alertRed)
+    const prayerContent = formData.formalPrayerForRelief || (
+      templateId === 'fraud_complaint' ? 'PRAYER FOR RELIEF:\nWherefore, it is most respectfully prayed that this Hon\'ble Authority may be pleased to:\na) Register an official FIR under Section 318 BNS 2023;\nb) Issue urgent directives to freeze suspect node accounts;\nc) Order full restitution of funds under RBI Zero Customer Liability Guidelines.' :
+      templateId === 'legal_notice' ? `PRAYER & DEMAND:\nYou are hereby called upon to satisfy the above grievance within ${formData.deadlineDays || '15 Days'}, failing which my Client shall initiate summary suit under Order 37 CPC at your sole cost and risk.` :
+      templateId === 'rti_application' ? 'PRAYER:\nIt is requested that certified copies of the information sought above be furnished to the Applicant within the statutory 30-day period under Section 7(1) of RTI Act 2005.' :
+      templateId === 'employment_grievance' ? 'PRAYER FOR RELIEF:\nIt is prayed that the Labour Authorities direct the Employer to release outstanding wages with 10x statutory compensation and interest thereon.' :
+      'PRAYER FOR RELIEF:\na) Direct Opposite Party to refund full purchase amount with interest;\nb) Award compensation for severe financial inconvenience and mental harassment.'
+    )
+
+    const prayerLines = prayerContent.split('\n')
+    for (let pLine of prayerLines) {
+      if (y < 65) break
+      page.drawText(pLine, { x: 45, y, size: 8.5, font: fontNorm, color: darkSlate })
+      y -= 13
     }
   }
 
   // -------------------------------------------------------------
   // FOOTER & SIGNATURE BLOCK (ALL TEMPLATES)
   // -------------------------------------------------------------
-  y = Math.min(y - 15, 130)
+  y = Math.min(y - 15, 120)
 
   // Verification Box
   page.drawRectangle({

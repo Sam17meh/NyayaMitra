@@ -31,10 +31,14 @@ import { createLegalDocumentPDF } from './services/pdfService.js'
 app.post(['/api/template/generate', '/api/documents/generate'], async (request, response) => {
   const body = request.body || {}
   const templateId = body.templateId || body.templateType || 'fraud_complaint'
-  const formData = body.formData ? { ...body.formData, ...body } : body
+  const rawFormData = body.formData ? { ...body.formData, ...body } : body
 
   try {
-    const pdfBytes = await createLegalDocumentPDF(templateId, formData)
+    // 1. Refine and formalize raw form inputs using Gemini AI legal drafting
+    const formalizedData = await formalizeDocumentWithGemini(templateId, rawFormData)
+
+    // 2. Render formal court petition PDF
+    const pdfBytes = await createLegalDocumentPDF(templateId, formalizedData)
 
     response.setHeader('Content-Type', 'application/pdf')
     response.setHeader('Content-Disposition', `attachment; filename="NyayaMitra_${templateId.toUpperCase()}_${Date.now()}.pdf"`)
