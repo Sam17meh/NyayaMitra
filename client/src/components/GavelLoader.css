@@ -1,0 +1,180 @@
+/* Nyaya Mitra - Flawless Pure White Seamless Gavel Loader Overlay */
+
+.gavel-loader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffffff !important;
+  color: #0f172a;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 400ms cubic-bezier(0.4, 0, 0.2, 1), visibility 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  overflow: hidden;
+}
+
+.gavel-loader-overlay.fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.gavel-loader-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 480px;
+  padding: 1.5rem;
+  box-sizing: border-box;
+  background-color: #ffffff !important;
+}
+
+/* Seamless Canvas Container - Absolutely zero borders, outlines, or background contrast */
+.gavel-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  height: 210px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  background-color: #ffffff !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.gavel-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background-color: #ffffff !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Preloader State */
+.gavel-preloader-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffffff !important;
+  z-index: 2;
+  gap: 0.6rem;
+}
+
+.gavel-spinner {
+  width: 26px;
+  height: 26px;
+  border: 2px solid rgba(30, 58, 138, 0.15);
+  border-top-color: #1e3a8a;
+  border-radius: 50%;
+  animation: gavel-spin 0.75s linear infinite;
+}
+
+@keyframes gavel-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.gavel-preload-text {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #64748b;
+  letter-spacing: 0.03em;
+}
+
+/* Premium Typography */
+.gavel-loader-branding {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.gavel-brand-title {
+  font-family: 'Merriweather', Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.gavel-brand-tagline {
+  font-family: 'Merriweather', Georgia, serif;
+  font-size: 0.78rem;
+  font-style: italic;
+  font-weight: 400;
+  color: #64748b;
+  margin-top: 0.35rem;
+  letter-spacing: 0.06em;
+}
+
+/* Micro Line Progress Bar */
+.gavel-progress-track {
+  width: 90px;
+  height: 2px;
+  background-color: #f1f5f9;
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 1.25rem;
+  position: relative;
+}
+
+.gavel-progress-bar-indeterminate {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 35%;
+  background: linear-gradient(90deg, #1e3a8a, #3b82f6);
+  border-radius: 9999px;
+  animation: gavel-indeterminate 1.4s ease-in-out infinite;
+}
+
+@keyframes gavel-indeterminate {
+  0% {
+    left: -35%;
+    width: 25%;
+  }
+  50% {
+    left: 35%;
+    width: 45%;
+  }
+  100% {
+    left: 100%;
+    width: 25%;
+  }
+}
+
+@media (max-width: 480px) {
+  .gavel-canvas-wrapper {
+    max-width: 280px;
+    height: 160px;
+  }
+
+  .gavel-brand-title {
+    font-size: 1.15rem;
+    letter-spacing: 0.1em;
+  }
+
+  .gavel-brand-tagline {
+    font-size: 0.72rem;
+  }
+}
