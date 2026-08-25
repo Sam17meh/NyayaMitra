@@ -448,10 +448,59 @@ export async function processMessage(message, getLegalContexts, language = 'Engl
 
         const rawData = n8nResponse.data || {};
         let ragAnswer = '';
+
         if (typeof rawData === 'string' && rawData.trim()) {
           ragAnswer = rawData.trim();
         } else if (typeof rawData === 'object') {
-          ragAnswer = rawData.answer || rawData.output || rawData.response || rawData.legalAdvice || rawData.result || rawData.text || '';
+          if (rawData.legalAdvice || rawData.applicableLaws || rawData.suggestedActions) {
+            const la = rawData.legalAdvice || rawData;
+            let md = `### 📌 1. EXECUTIVE CASE SUMMARY & LEGAL TRIAGE\n`;
+            md += `- **Overview**: Detailed statutory analysis for query: "${message}".\n`;
+            md += `- **Urgency Level**: **${la.urgencyLevel || 'HIGH'}**\n`;
+            md += `- **Primary Legal Category**: ${domainInfo.category}\n\n---\n\n`;
+
+            if (Array.isArray(la.applicableLaws) && la.applicableLaws.length > 0) {
+              md += `### ⚖️ 2. APPLICABLE LAWS, SECTIONS & STATUTORY PROVISIONS\n`;
+              la.applicableLaws.forEach(item => {
+                if (typeof item === 'string') {
+                  md += `- ${item}\n`;
+                } else if (item.law) {
+                  md += `- **${item.law}**: ${item.description || ''}\n`;
+                }
+              });
+              md += `\n---\n\n`;
+            }
+
+            if (Array.isArray(la.recommendedDocuments) && la.recommendedDocuments.length > 0) {
+              md += `### 📄 3. REQUIRED & NECESSARY DOCUMENTS CHECKLIST\n`;
+              la.recommendedDocuments.forEach(doc => {
+                md += `- [ ] **${doc}**\n`;
+              });
+              md += `\n---\n\n`;
+            }
+
+            if (Array.isArray(la.suggestedActions) && la.suggestedActions.length > 0) {
+              md += `### 🚀 4. STEP-BY-STEP PRACTICAL ACTION PLAN\n`;
+              la.suggestedActions.forEach((act, idx) => {
+                if (typeof act === 'string') {
+                  md += `${idx + 1}. ${act}\n`;
+                } else if (act.step || act.action) {
+                  md += `${idx + 1}. **${act.step || 'Step'}**: ${act.action}\n`;
+                }
+              });
+              md += `\n---\n\n`;
+            }
+
+            md += `### 🛡️ 5. FREE LEGAL AID & EMERGENCY HELPLINES DIRECTORY\n`;
+            md += `- **NALSA Legal Aid Hotline**: Call **15100** for free court advocates via DLSA.\n`;
+            md += `- **National Emergency & Police**: Call **112** for immediate police response.\n`;
+            md += `- **Cyber Fraud Helpline**: Call **1930** within 2 hours of online financial fraud.\n\n`;
+            md += `---\n*Disclaimer: NyayaMitra RAG Engine provides automated legal information under Indian Law.*`;
+            
+            ragAnswer = md;
+          } else {
+            ragAnswer = rawData.answer || rawData.output || rawData.response || rawData.result || rawData.text || '';
+          }
         }
 
         if (ragAnswer && typeof ragAnswer === 'string' && ragAnswer.length > 20) {
