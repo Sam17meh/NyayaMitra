@@ -12,4 +12,4 @@
 **Database**: PostgreSQL
 **Auth**: Firebase | **AI**: Claude API | **PDF**: pdf-lib | **SMS**: MSG91
 
-*Internal SIH 2026 — IILM University, Greater Noida*
+*Internal SIH Hackathon 2026 — IILM University, Greater Noida*
